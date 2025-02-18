@@ -10,7 +10,7 @@ from torchvision import transforms
 app = Flask(__name__)
 
 # Define the ONNX model file name and download URL
-onnx_model_path = "deepfake_model.onnx"
+onnx_model_path = "/data/deepfake_model.onnx"
 # Direct download URL from Google Drive
 download_url = "https://drive.google.com/uc?id=1NJu6CkaOhsz_7xE4ztjdXJ_EFeQa_gCQ&export=download"
 
