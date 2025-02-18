@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+*.swp
+deepfake_model.onnx  # Avoid committing large files
+temp_video.mp4
+.DS_Store
+.env
