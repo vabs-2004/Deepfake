@@ -9,31 +9,49 @@ from torchvision import transforms
 
 app = Flask(__name__)
 
-# Define the ONNX model file name and download URL
+# ✅ Define the ONNX model file path in Railway persistent storage
 onnx_model_path = "/data/deepfake_model.onnx"
-# Direct download URL from Google Drive
-download_url = "https://drive.google.com/uc?id=1NJu6CkaOhsz_7xE4ztjdXJ_EFeQa_gCQ&export=download"
 
-# Download the model if it doesn't exist
-if not os.path.exists(onnx_model_path):
-    print("Downloading ONNX model from Google Drive...")
-    response = requests.get(download_url)
-    if response.status_code == 200:
-        with open(onnx_model_path, "wb") as f:
-            f.write(response.content)
-        print("Download complete!")
-    else:
-        print("Failed to download model, status code:", response.status_code)
+# ✅ Google Drive Direct Download Link Conversion
+GOOGLE_DRIVE_FILE_ID = "1NJu6CkaOhsz_7xE4ztjdXJ_EFeQa_gCQ"
+download_url = f"https://drive.google.com/uc?export=download&id={GOOGLE_DRIVE_FILE_ID}"
 
-# Define image preprocessing
+# ✅ Ensure model is downloaded before loading
+def download_model():
+    if not os.path.exists(onnx_model_path):
+        print("Downloading ONNX model from Google Drive...")
+
+        response = requests.get(download_url, stream=True)
+        if response.status_code == 200:
+            # ✅ Ensure /data directory exists
+            os.makedirs(os.path.dirname(onnx_model_path), exist_ok=True)
+            
+            # ✅ Save the model properly in chunks to prevent corruption
+            with open(onnx_model_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            print("Download complete!")
+        else:
+            print(f"Failed to download model, status code: {response.status_code}")
+            raise RuntimeError("ONNX model download failed.")
+
+# ✅ Download the model if it's missing
+download_model()
+
+# ✅ Define image preprocessing
 transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# Load ONNX model using ONNX Runtime
-ort_session = ort.InferenceSession(onnx_model_path, providers=["CPUExecutionProvider"])
+# ✅ Load ONNX model using ONNX Runtime
+try:
+    ort_session = ort.InferenceSession(onnx_model_path, providers=["CPUExecutionProvider"])
+    print("ONNX model loaded successfully!")
+except Exception as e:
+    print("Error loading ONNX model:", str(e))
+    raise RuntimeError("ONNX model could not be loaded.")
 
 def predict_video(video_path):
     cap = cv2.VideoCapture(video_path)
@@ -48,7 +66,6 @@ def predict_video(video_path):
             break
 
         if frame_index % sample_rate == 0:  # Apply frame sampling
-            # Resize frame before converting to reduce overhead
             frame = cv2.resize(frame, (224, 224))
             image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             image_tensor = transform(image).unsqueeze(0).numpy()
