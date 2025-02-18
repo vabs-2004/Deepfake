@@ -1,6 +1,0 @@
-flask
-onnxruntime
-opencv-python
-numpy
-pillow
-torchvision
