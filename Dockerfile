@@ -1,5 +1,5 @@
 # Use a lightweight Python image as the base
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # Install system dependencies required by OpenCV
 RUN apt-get update && \
