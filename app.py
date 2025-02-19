@@ -9,45 +9,49 @@ from torchvision import transforms
 
 app = Flask(__name__)
 
-# ✅ Define the ONNX model file path in Railway persistent storage
+# Define the ONNX model file path in Railway persistent storage
 onnx_model_path = "/data/deepfake_model.onnx"
-
-# ✅ Your GitHub Release URL
+# Your GitHub Release URL for the model
 download_url = "https://github.com/vabs-2004/Deepfake/releases/download/model/deepfake_model.onnx"
 
 def download_model():
     if not os.path.exists(onnx_model_path):
         print("Downloading ONNX model from GitHub Releases...")
-        headers = {"User-Agent": "Mozilla/5.0"}  # Prevents GitHub 403 errors
-        response = requests.get(download_url, headers=headers, stream=True)
-
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(download_url, headers=headers, stream=True, allow_redirects=True)
         if response.status_code == 200:
             os.makedirs(os.path.dirname(onnx_model_path), exist_ok=True)
             with open(onnx_model_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            print("✅ Download complete!")
+            print("Download complete!")
+            
+            file_size = os.path.getsize(onnx_model_path)
+            print("Downloaded file size (bytes):", file_size)
+            # Check if file size is suspiciously low (e.g., < 300 MB)
+            if file_size < 300 * 1024 * 1024:
+                raise RuntimeError("Downloaded model file size is too small, indicating an incomplete download.")
         else:
-            print(f"❌ Failed to download model, status code: {response.status_code}")
+            print(f"Failed to download model, status code: {response.status_code}")
             raise RuntimeError("ONNX model download failed.")
 
-# ✅ Download the model if it’s not already present
+# Attempt to download the model if it's not present
 download_model()
 
-# ✅ Define image preprocessing
+# Define image preprocessing
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225])
 ])
 
-# ✅ Load ONNX model using ONNX Runtime
+# Load ONNX model using ONNX Runtime
 try:
     ort_session = ort.InferenceSession(onnx_model_path, providers=["CPUExecutionProvider"])
-    print("✅ ONNX model loaded successfully!")
+    print("ONNX model loaded successfully!")
 except Exception as e:
-    print("❌ Error loading ONNX model:", str(e))
+    print("Error loading ONNX model:", str(e))
     raise RuntimeError("ONNX model could not be loaded.")
 
 def predict_video(video_path):
@@ -87,7 +91,7 @@ def predict():
         return jsonify({"error": "No file uploaded"}), 400
 
     file = request.files["file"]
-    temp_video_path = "temp_video.mp4"
+    temp_video_path = "/data/temp_video.mp4"
     file.save(temp_video_path)
 
     result = predict_video(temp_video_path)
